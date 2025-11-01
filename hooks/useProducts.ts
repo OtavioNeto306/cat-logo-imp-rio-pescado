@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import { initialProducts, initialCategories } from '../data/products';
 import { Product, Category } from '../types';
+import { hasProductionData, getProductionData } from '../data/catalogData';
 
 const PRODUCTS_STORAGE_KEY = 'imperio_pescado_products';
 const CATEGORIES_STORAGE_KEY = 'imperio_pescado_categories';
@@ -28,14 +29,23 @@ export const useProducts = () => {
       console.error("Failed to parse products from localStorage", error);
     }
 
-    const productsToInitialize = loadedProducts.length > 0 ? loadedProducts : initialProducts;
+    // Determine which data source to use
+    let defaultProducts = initialProducts;
+    
+    // Use production data if available and no localStorage data exists
+    if (hasProductionData() && loadedProducts.length === 0) {
+      const productionData = getProductionData();
+      defaultProducts = productionData.products;
+    }
+
+    const productsToInitialize = loadedProducts.length > 0 ? loadedProducts : defaultProducts;
 
     const productsWithDefaults = productsToInitialize.map(p => ({
       ...p,
       isActive: p.isActive === undefined ? true : p.isActive,
     }));
 
-    if (loadedProducts.length === 0 && initialProducts.length > 0) {
+    if (loadedProducts.length === 0 && defaultProducts.length > 0) {
         window.localStorage.setItem(PRODUCTS_STORAGE_KEY, JSON.stringify(productsWithDefaults));
     }
     
@@ -53,14 +63,23 @@ export const useProducts = () => {
       console.error("Failed to parse categories from localStorage", error);
     }
 
-    const categoriesToInitialize = loadedCategories.length > 0 ? loadedCategories : initialCategories;
+    // Determine which data source to use
+    let defaultCategories = initialCategories;
+    
+    // Use production data if available and no localStorage data exists
+    if (hasProductionData() && loadedCategories.length === 0) {
+      const productionData = getProductionData();
+      defaultCategories = productionData.categories;
+    }
+
+    const categoriesToInitialize = loadedCategories.length > 0 ? loadedCategories : defaultCategories;
 
     const categoriesWithDefaults = categoriesToInitialize.map(c => ({
         ...c,
         isActive: c.isActive === undefined ? true : c.isActive,
     }));
 
-    if (loadedCategories.length === 0 && initialCategories.length > 0) {
+    if (loadedCategories.length === 0 && defaultCategories.length > 0) {
         window.localStorage.setItem(CATEGORIES_STORAGE_KEY, JSON.stringify(categoriesWithDefaults));
     }
 

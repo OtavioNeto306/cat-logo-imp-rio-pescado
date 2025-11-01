@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { useProducts } from '../hooks/useProducts';
 import { Product, Category } from '../types';
 import ProductForm from '../components/ProductForm';
 import { Link } from 'react-router-dom';
+import { DataManager } from '../utils/dataManager';
 
 const CategoryForm: React.FC<{
     category?: Category | null;
@@ -179,6 +180,89 @@ const CategoryManager: React.FC<{
 };
 
 
+const DataManagement: React.FC = () => {
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isImporting, setIsImporting] = useState(false);
+
+  const handleExport = () => {
+    DataManager.downloadData();
+  };
+
+  const handleImportClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    setIsImporting(true);
+    try {
+      const success = await DataManager.loadFromFile(file);
+      if (success) {
+        alert('✅ Dados importados com sucesso! A página será recarregada.');
+        window.location.reload();
+      } else {
+        alert('❌ Erro ao importar dados. Verifique se o arquivo está correto.');
+      }
+    } catch (error) {
+      alert('❌ Erro ao processar arquivo. Verifique se é um arquivo JSON válido.');
+    } finally {
+      setIsImporting(false);
+      // Reset input
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  };
+
+  const handleClearData = () => {
+    DataManager.clearAllData();
+  };
+
+  return (
+    <div className="bg-blue-50 p-4 rounded-lg mb-6 border border-blue-200">
+      <h3 className="font-semibold text-lg text-blue-800 mb-3">🔄 Gerenciamento de Dados</h3>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+        <button
+          onClick={handleExport}
+          className="bg-blue-600 text-white font-medium py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors text-sm"
+        >
+          📥 Exportar Dados
+        </button>
+        
+        <button
+          onClick={handleImportClick}
+          disabled={isImporting}
+          className="bg-green-600 text-white font-medium py-2 px-4 rounded-lg hover:bg-green-700 transition-colors text-sm disabled:opacity-50"
+        >
+          {isImporting ? '⏳ Importando...' : '📤 Importar Dados'}
+        </button>
+        
+        <button
+          onClick={handleClearData}
+          className="bg-red-600 text-white font-medium py-2 px-4 rounded-lg hover:bg-red-700 transition-colors text-sm"
+        >
+          🗑️ Limpar Tudo
+        </button>
+      </div>
+      
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".json"
+        onChange={handleFileChange}
+        className="hidden"
+      />
+      
+      <div className="mt-3 text-xs text-blue-600">
+        <p><strong>💡 Dica:</strong> Use "Exportar" para fazer backup dos seus dados antes de fazer alterações importantes.</p>
+        <p><strong>🚀 Para produção:</strong> Exporte os dados e commit no Git para deploy automático na Vercel.</p>
+      </div>
+    </div>
+  );
+};
+
 const AdminPage: React.FC = () => {
   const { allProducts, allCategories, addProduct, updateProduct, deleteProduct, addCategory, updateCategory, deleteCategory, toggleCategoryActive } = useProducts();
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -251,6 +335,8 @@ const AdminPage: React.FC = () => {
         </div>
         <Link to="/" className="text-sm text-accent hover:underline">← Voltar ao site</Link>
       </div>
+      
+      <DataManagement />
       
       <CategoryManager 
         categories={allCategories} // Pass all categories to category manager
