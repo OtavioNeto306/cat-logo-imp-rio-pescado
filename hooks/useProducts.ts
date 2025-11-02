@@ -1,256 +1,329 @@
-import { useState, useMemo, useEffect } from 'react';
-import { initialProducts, initialCategories } from '../data/products';
+import { useState, useEffect } from 'react';
 import { Product, Category } from '../types';
-import { hasProductionData, getProductionData } from '../data/catalogData';
-
-const PRODUCTS_STORAGE_KEY = 'imperio_pescado_products';
-const CATEGORIES_STORAGE_KEY = 'imperio_pescado_categories';
-
-const generateSlug = (name: string): string => {
-  if (!name) return '';
-  return name
-      .toLowerCase()
-      .normalize("NFD").replace(/[\u0300-\u036f]/g, "") // Remove accents
-      .replace(/[^a-z0-9\s-]/g, '') // Remove special chars
-      .trim()
-      .replace(/\s+/g, '-') // Replace spaces with -
-      .replace(/-+/g, '-'); // Replace multiple - with single -
-};
+import { supabase } from '../lib/supabase';
 
 export const useProducts = () => {
-  const [products, setProducts] = useState<Product[]>(() => {
-    let loadedProducts: Product[] = [];
-    try {
-      const storedProducts = window.localStorage.getItem(PRODUCTS_STORAGE_KEY);
-      if (storedProducts) {
-        loadedProducts = JSON.parse(storedProducts);
-      }
-    } catch (error) {
-      console.error("Failed to parse products from localStorage", error);
-    }
-
-    // Determine which data source to use
-    let defaultProducts = initialProducts;
-    
-    // Use production data if available and no localStorage data exists
-    if (hasProductionData() && loadedProducts.length === 0) {
-      const productionData = getProductionData();
-      defaultProducts = productionData.products;
-    }
-
-    const productsToInitialize = loadedProducts.length > 0 ? loadedProducts : defaultProducts;
-
-    const productsWithDefaults = productsToInitialize.map(p => ({
-      ...p,
-      isActive: p.isActive === undefined ? true : p.isActive,
-    }));
-
-    if (loadedProducts.length === 0 && defaultProducts.length > 0) {
-        window.localStorage.setItem(PRODUCTS_STORAGE_KEY, JSON.stringify(productsWithDefaults));
-    }
-    
-    return productsWithDefaults;
-  });
-
-  const [categories, setCategories] = useState<Category[]>(() => {
-    let loadedCategories: Category[] = [];
-    try {
-      const storedCategories = window.localStorage.getItem(CATEGORIES_STORAGE_KEY);
-      if (storedCategories) {
-        loadedCategories = JSON.parse(storedCategories);
-      }
-    } catch (error) {
-      console.error("Failed to parse categories from localStorage", error);
-    }
-
-    // Determine which data source to use
-    let defaultCategories = initialCategories;
-    
-    // Use production data if available and no localStorage data exists
-    if (hasProductionData() && loadedCategories.length === 0) {
-      const productionData = getProductionData();
-      defaultCategories = productionData.categories;
-    }
-
-    const categoriesToInitialize = loadedCategories.length > 0 ? loadedCategories : defaultCategories;
-
-    const categoriesWithDefaults = categoriesToInitialize.map(c => ({
-        ...c,
-        isActive: c.isActive === undefined ? true : c.isActive,
-    }));
-
-    if (loadedCategories.length === 0 && defaultCategories.length > 0) {
-        window.localStorage.setItem(CATEGORIES_STORAGE_KEY, JSON.stringify(categoriesWithDefaults));
-    }
-
-    return categoriesWithDefaults;
-  });
-
+  const [products, setProducts] = useState<Product[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  
+  // Estados para busca e filtro
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
 
-  // Persist products to localStorage whenever they change
-  useEffect(() => {
-    try {
-      window.localStorage.setItem(PRODUCTS_STORAGE_KEY, JSON.stringify(products));
-    } catch (error) {
-      console.error("Failed to save products to localStorage", error);
-    }
-  }, [products]);
-
-  // Persist categories to localStorage whenever they change
-  useEffect(() => {
-    try {
-        window.localStorage.setItem(CATEGORIES_STORAGE_KEY, JSON.stringify(categories));
-    } catch (error) {
-        console.error("Failed to save categories to localStorage", error);
-    }
-  }, [categories]);
-
-  const allCategories = useMemo(() => categories, [categories]); // For admin view
-
-  const activeCategories = useMemo(() => categories.filter(cat => cat.isActive), [categories]); // For public view
-
-  const filteredProducts = useMemo(() => {
-    let filtered: Product[] = [...products];
-
-    // Get active categories to filter products
-    const currentlyActiveCategories = activeCategories.map(cat => cat.slug);
-
-    // Only show active products whose categories are also active
-    filtered = filtered.filter(p => p.isActive && currentlyActiveCategories.includes(p.category)); 
-
-    if (selectedCategory) {
-      filtered = filtered.filter(p => p.category === selectedCategory);
-    }
-
+  // Dados filtrados (apenas ativos)
+  const activeCategories = categories.filter(c => c.isActive);
+  
+  // Filtrar produtos por busca e categoria
+  const filteredProducts = products.filter(p => {
+    if (!p.isActive) return false;
+    
+    // Filtro por categoria
+    if (selectedCategory && p.category !== selectedCategory) return false;
+    
+    // Filtro por termo de busca
     if (searchTerm) {
-      const lowercasedFilter = searchTerm.toLowerCase();
-      filtered = filtered.filter(product =>
-        product.name.toLowerCase().includes(lowercasedFilter) ||
-        product.code.toLowerCase().includes(lowercasedFilter) ||
-        product.description.toLowerCase().includes(lowercasedFilter)
-      );
-    }
-    
-    return filtered;
-  }, [products, searchTerm, selectedCategory, activeCategories]);
-
-  // Use this for admin panel, where all products (active or not) should be visible
-  const allProductsIncludingInactive = useMemo(() => products, [products]);
-
-  const getProductByCode = (code: string): Product | undefined => {
-    return products.find(p => p.code === code);
-  };
-  
-  const getCategoryBySlug = (slug: string): Category | undefined => {
-      return allCategories.find(c => c.slug === slug);
-  };
-  
-  const addProduct = (product: Product) => {
-    setProducts(prevProducts => [...prevProducts, { ...product, isActive: product.isActive === undefined ? true : product.isActive }]); // Ensure new products respect isActive or default to true
-  };
-
-  const updateProduct = (updatedProduct: Product) => {
-    setProducts(prevProducts => 
-      prevProducts.map(p => (p.code === updatedProduct.code ? updatedProduct : p))
-    );
-  };
-
-  const deleteProduct = (code: string) => {
-    setProducts(prevProducts => prevProducts.filter(p => p.code !== code));
-  };
-
-  const addCategory = (category: Omit<Category, 'slug'>): boolean => {
-    const slug = generateSlug(category.name);
-
-    if (allCategories.some(c => c.slug === slug)) {
-        alert('Erro: Uma categoria com nome similar (mesmo slug) já existe.');
-        return false;
-    }
-
-    const newCategory: Category = { ...category, slug, isActive: true }; // New categories are active by default
-    setCategories(prev => [...prev, newCategory]);
-    return true;
-  };
-
-  const updateCategory = (slugToUpdate: string, data: { name: string; imageUrl: string }): boolean => {
-    const newSlug = generateSlug(data.name);
-    
-    if (newSlug !== slugToUpdate && allCategories.some(c => c.slug === newSlug)) {
-      alert('Erro: Já existe uma categoria com um nome similar (mesmo slug).');
-      return false;
-    }
-
-    setCategories(prevCategories => 
-      prevCategories.map(cat => 
-        cat.slug === slugToUpdate 
-          ? { ...cat, name: data.name, imageUrl: data.imageUrl, slug: newSlug } 
-          : cat
-      )
-    );
-
-    // If the slug changed, update all associated products
-    if (slugToUpdate !== newSlug) {
-      setProducts(prevProducts =>
-        prevProducts.map(p => 
-          p.category === slugToUpdate ? { ...p, category: newSlug } : p
-        )
+      const searchLower = searchTerm.toLowerCase();
+      return (
+        p.name.toLowerCase().includes(searchLower) ||
+        p.description.toLowerCase().includes(searchLower) ||
+        p.code.toLowerCase().includes(searchLower)
       );
     }
     
     return true;
-  };
+  });
+  
+  const activeProducts = products.filter(p => p.isActive);
 
-  const toggleCategoryActive = (slug: string) => {
-    setCategories(prevCategories => {
-        const updatedCategories = prevCategories.map(cat => 
-            cat.slug === slug ? { ...cat, isActive: !cat.isActive } : cat
-        );
-        // Find the new status of the category
-        const newCategoryStatus = updatedCategories.find(cat => cat.slug === slug)?.isActive;
+  // Carregar dados iniciais
+  const loadData = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      // Buscar categorias do Supabase
+      const { data: categoriesData, error: categoriesError } = await supabase
+        .from('categories')
+        .select('*')
+        .order('name');
 
-        // Update all products belonging to this category to match its new status
-        setProducts(prevProducts => 
-            prevProducts.map(p => 
-                p.category === slug ? { ...p, isActive: newCategoryStatus } : p
-            )
-        );
-        return updatedCategories;
-    });
-  };
+      if (categoriesError) {
+        throw new Error(`Erro ao carregar categorias: ${categoriesError.message}`);
+      }
 
-  const deleteCategory = (slug: string): boolean => {
-    if (products.some(p => p.category === slug)) {
-      alert('Não é possível excluir esta categoria, pois existem produtos associados a ela.');
-      return false;
+      // Buscar produtos do Supabase
+      const { data: productsData, error: productsError } = await supabase
+        .from('products')
+        .select('*')
+        .order('name');
+
+      if (productsError) {
+        throw new Error(`Erro ao carregar produtos: ${productsError.message}`);
+      }
+
+      // Converter dados do Supabase para o formato da aplicação
+      const formattedCategories: Category[] = (categoriesData || []).map(cat => ({
+        code: cat.code,
+        slug: cat.slug,
+        name: cat.name,
+        imageUrl: cat.image_url,
+        isActive: cat.is_active
+      }));
+
+      const formattedProducts: Product[] = (productsData || []).map(prod => ({
+        code: prod.code,
+        slug: prod.slug,
+        name: prod.name,
+        category: prod.category_code,
+        imageUrl: prod.image_url,
+        description: prod.description || '',
+        price: prod.price || 0,
+        images: Array.isArray(prod.images) ? prod.images : [],
+        isActive: prod.is_active
+      }));
+
+      setCategories(formattedCategories);
+      setProducts(formattedProducts);
+      
+    } catch (err) {
+      console.error('Erro ao carregar dados:', err);
+      setError(err instanceof Error ? err.message : 'Erro ao carregar dados');
+    } finally {
+      setLoading(false);
     }
+  };
 
-    if (window.confirm('Tem certeza que deseja excluir esta categoria? A ação não pode ser desfeita.')) {
-      setCategories(prevCategories => prevCategories.filter(cat => cat.slug !== slug));
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  // Funções de busca
+  const getProductByCode = (code: string) => products.find(p => p.code === code);
+  const getProductBySlug = (slug: string) => products.find(p => p.name.toLowerCase().replace(/\s+/g, '-') === slug);
+  const getCategoryByCode = (code: string) => categories.find(c => c.code === code);
+  const getCategoryBySlug = (slug: string) => categories.find(c => c.slug === slug);
+  const getProductsByCategory = (categoryCode: string) => products.filter(p => p.category === categoryCode);
+
+  // CRUD Produtos
+  const addProduct = async (product: Product): Promise<boolean> => {
+    try {
+      const newProduct = {
+        code: product.code || `PROD${Date.now()}`,
+        slug: product.slug || product.name.toLowerCase().replace(/\s+/g, '-'),
+        name: product.name,
+        category_code: product.category,
+        image_url: product.imageUrl,
+        description: product.description,
+        price: product.price,
+        images: product.images,
+        is_active: product.isActive
+      };
+
+      const { error } = await supabase
+        .from('products')
+        .insert([newProduct]);
+
+      if (error) {
+        throw new Error(error.message);
+      }
+
+      // Recarregar dados após inserção
+      await loadData();
       return true;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Erro ao adicionar produto');
+      return false;
     }
-    return false;
   };
 
+  const updateProduct = async (code: string, product: Product): Promise<boolean> => {
+    try {
+      const updatedProduct = {
+        slug: product.slug || product.name.toLowerCase().replace(/\s+/g, '-'),
+        name: product.name,
+        category_code: product.category,
+        image_url: product.imageUrl,
+        description: product.description,
+        price: product.price,
+        images: product.images,
+        is_active: product.isActive
+      };
+
+      const { error } = await supabase
+        .from('products')
+        .update(updatedProduct)
+        .eq('code', code);
+
+      if (error) {
+        throw new Error(error.message);
+      }
+
+      // Recarregar dados após atualização
+      await loadData();
+      return true;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Erro ao atualizar produto');
+      return false;
+    }
+  };
+
+  const deleteProduct = async (code: string): Promise<boolean> => {
+    try {
+      const { error } = await supabase
+        .from('products')
+        .delete()
+        .eq('code', code);
+
+      if (error) {
+        throw new Error(error.message);
+      }
+
+      // Recarregar dados após exclusão
+      await loadData();
+      return true;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Erro ao excluir produto');
+      return false;
+    }
+  };
+
+  // CRUD Categorias
+  const addCategory = async (category: Category): Promise<boolean> => {
+    try {
+      const newCategory = {
+        code: category.code || `CAT${Date.now()}`,
+        slug: category.slug || category.name.toLowerCase().replace(/\s+/g, '-'),
+        name: category.name,
+        image_url: category.imageUrl,
+        is_active: category.isActive
+      };
+
+      const { error } = await supabase
+        .from('categories')
+        .insert([newCategory]);
+
+      if (error) {
+        throw new Error(error.message);
+      }
+
+      // Recarregar dados após inserção
+      await loadData();
+      return true;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Erro ao adicionar categoria');
+      return false;
+    }
+  };
+
+  const updateCategory = async (code: string, category: Category): Promise<boolean> => {
+    try {
+      const updatedCategory = {
+        slug: category.slug || category.name.toLowerCase().replace(/\s+/g, '-'),
+        name: category.name,
+        image_url: category.imageUrl,
+        is_active: category.isActive
+      };
+
+      const { error } = await supabase
+        .from('categories')
+        .update(updatedCategory)
+        .eq('code', code);
+
+      if (error) {
+        throw new Error(error.message);
+      }
+
+      // Recarregar dados após atualização
+      await loadData();
+      return true;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Erro ao atualizar categoria');
+      return false;
+    }
+  };
+
+  const deleteCategory = async (code: string): Promise<boolean> => {
+    try {
+      const { error } = await supabase
+        .from('categories')
+        .delete()
+        .eq('code', code);
+
+      if (error) {
+        throw new Error(error.message);
+      }
+
+      // Recarregar dados após exclusão
+      await loadData();
+      return true;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Erro ao excluir categoria');
+      return false;
+    }
+  };
+
+  const toggleCategoryActive = async (code: string): Promise<boolean> => {
+    try {
+      const category = getCategoryByCode(code);
+      if (!category) return false;
+
+      const newActiveState = !category.isActive;
+      
+      const { error } = await supabase
+        .from('categories')
+        .update({ is_active: newActiveState })
+        .eq('code', code);
+
+      if (error) {
+        throw new Error(error.message);
+      }
+
+      // Se desativando a categoria, desativar todos os produtos dessa categoria
+      if (!newActiveState) {
+        const { error: productsError } = await supabase
+          .from('products')
+          .update({ is_active: false })
+          .eq('category_code', code);
+
+        if (productsError) {
+          throw new Error(productsError.message);
+        }
+      }
+
+      // Recarregar dados após atualização
+      await loadData();
+      return true;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Erro ao alterar status da categoria');
+      return false;
+    }
+  };
 
   return {
-    products: filteredProducts, // This is for public facing view (only active products from active categories)
-    allProducts: allProductsIncludingInactive, // This is for admin view (all products, active or not)
-    categories: activeCategories, // For public-facing views, only active categories
-    allCategories: allCategories, // For admin panel, all categories (active or not)
+    loading,
+    error,
+    products: filteredProducts, // Produtos filtrados por busca e categoria
+    categories: activeCategories,
+    allProducts: products,
+    allCategories: categories,
     searchTerm,
     setSearchTerm,
     selectedCategory,
     setSelectedCategory,
     getProductByCode,
+    getProductBySlug,
+    getCategoryByCode,
     getCategoryBySlug,
+    getProductsByCategory,
     addProduct,
     updateProduct,
     deleteProduct,
     addCategory,
     updateCategory,
     deleteCategory,
-    toggleCategoryActive, // New function for category activation
+    toggleCategoryActive,
+    refreshData: loadData,
   };
 };

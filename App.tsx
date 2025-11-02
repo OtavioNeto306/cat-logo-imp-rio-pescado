@@ -8,7 +8,8 @@ import CatalogPage from './pages/CatalogPage';
 import ProductDetailPage from './pages/ProductDetailPage';
 import AboutPage from './pages/AboutPage';
 import ContactPage from './pages/ContactPage';
-import AdminPage from './pages/AdminPage'; // Import the new Admin page
+import AdminPage from './pages/AdminPage';
+import ProtectedRoute from './components/ProtectedRoute';
 
 const Layout: React.FC<{children: React.ReactNode}> = ({ children }) => {
     const location = useLocation();
@@ -31,23 +32,26 @@ const Layout: React.FC<{children: React.ReactNode}> = ({ children }) => {
     );
 };
 
-
-const App: React.FC = () => {
+function App() {
   return (
     <HashRouter>
-        <Layout>
-            <Routes>
-                <Route path="/" element={<HomePage />} />
-                <Route path="/catalogo" element={<CatalogPage />} />
-                <Route path="/catalogo/:categorySlug" element={<CatalogPage />} />
-                <Route path="/catalogo/:categorySlug/:productCode" element={<ProductDetailPage />} />
-                <Route path="/sobre" element={<AboutPage />} />
-                <Route path="/contato" element={<ContactPage />} />
-                <Route path="/admin" element={<AdminPage />} />
-            </Routes>
-        </Layout>
+      <Layout>
+        <Routes>
+          <Route path="/" element={<HomePage />} />
+          <Route path="/catalogo" element={<CatalogPage />} />
+          <Route path="/catalogo/:categorySlug" element={<CatalogPage />} />
+          <Route path="/catalogo/:categorySlug/:productCode" element={<ProductDetailPage />} />
+          <Route path="/sobre" element={<AboutPage />} />
+          <Route path="/contato" element={<ContactPage />} />
+          <Route path="/admin" element={
+            <ProtectedRoute>
+              <AdminPage />
+            </ProtectedRoute>
+          } />
+        </Routes>
+      </Layout>
     </HashRouter>
   );
-};
+}
 
 export default App;

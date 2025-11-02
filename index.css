@@ -1,0 +1,18 @@
+@import "tailwindcss";
+
+@theme {
+  --color-primary: #111827;
+  --color-accent: #16A34A;
+  --color-neutral: #F9FAFB;
+  --font-family-sans: Inter, sans-serif;
+  --font-family-display: Poppins, sans-serif;
+}
+
+/* Custom styles */
+body {
+  font-family: 'Inter', sans-serif;
+}
+
+.font-display {
+  font-family: 'Inter', sans-serif;
+}
