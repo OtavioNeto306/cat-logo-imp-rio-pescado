@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Product, Category } from '../types';
 
@@ -13,7 +14,7 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, categories, onSubmit
     code: '',
     name: '',
     description: '',
-    category: categories[0]?.code || '',
+    category: categories[0]?.slug || '',
     images: [],
     isActive: true, // Default to active for new products
   });
@@ -30,7 +31,7 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, categories, onSubmit
             code: '',
             name: '',
             description: '',
-            category: categories[0]?.code || '',
+            category: categories[0]?.slug || '',
             images: [],
             isActive: true,
         });
@@ -38,11 +39,13 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, categories, onSubmit
     }
   }, [product, categories]);
 
+  // Fix: Safely access 'checked' property by checking element type
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
-    const { name, value, type, checked } = e.target;
+    const { name, value } = e.target;
+    const type = e.target.type;
     setFormData(prev => ({ 
         ...prev, 
-        [name]: type === 'checkbox' ? checked : value 
+        [name]: type === 'checkbox' ? (e.target as HTMLInputElement).checked : value 
     }));
   };
 
@@ -115,7 +118,7 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, categories, onSubmit
                         className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-accent focus:border-accent sm:text-sm rounded-md"
                     >
                         {categories.map(cat => (
-                            <option key={cat.code} value={cat.code}>{cat.name} {cat.isActive ? '' : '(Inativa)'}</option>
+                            <option key={cat.slug} value={cat.slug}>{cat.name} {cat.isActive ? '' : '(Inativa)'}</option>
                         ))}
                     </select>
                 </div>

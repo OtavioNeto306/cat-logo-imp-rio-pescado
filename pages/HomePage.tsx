@@ -5,32 +5,43 @@ import ProductCard from '../components/ProductCard';
 import { useProducts } from '../hooks/useProducts';
 
 const HomePage: React.FC = () => {
-  const { categories, products } = useProducts(); // 'products' and 'categories' here will already be filtered for isActive: true
+  const { categories, products, isLoading, error } = useProducts(); // 'products' and 'categories' here will already be filtered for isActive: true
   const featuredProducts = products.slice(0, 4);
 
   return (
     <>
       <Hero />
-      <div className="bg-neutral">
-        <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-16">
-          <h2 className="text-3xl font-bold font-display text-center text-primary mb-12">Nossas Categorias</h2>
-          <div className="grid grid-cols-1 gap-y-10 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 xl:gap-x-8 gap-6">
-            {categories.map((category) => (
-              <CategoryCard key={category.slug} category={category} />
-            ))}
-          </div>
+      {isLoading ? (
+        <div className="text-center py-16 text-xl text-primary">Carregando dados...</div>
+      ) : error ? (
+        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-8" role="alert">
+            <strong className="font-bold">Erro:</strong>
+            <span className="block sm:inline"> {error}</span>
         </div>
-      </div>
-       <div className="bg-white">
-        <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-16">
-          <h2 className="text-3xl font-bold font-display text-center text-primary mb-12">Produtos em Destaque</h2>
-          <div className="grid grid-cols-1 gap-y-10 sm:grid-cols-2 lg:grid-cols-4 xl:gap-x-8 gap-6">
-            {featuredProducts.map((product) => (
-              <ProductCard key={product.code} product={product} />
-            ))}
+      ) : (
+        <>
+          <div className="bg-neutral">
+            <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-16">
+              <h2 className="text-3xl font-bold font-display text-center text-primary mb-12">Nossas Categorias</h2>
+              <div className="grid grid-cols-1 gap-y-10 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 xl:gap-x-8 gap-6">
+                {categories.map((category) => (
+                  <CategoryCard key={category.slug} category={category} />
+                ))}
+              </div>
+            </div>
           </div>
-        </div>
-      </div>
+          <div className="bg-white">
+            <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-16">
+              <h2 className="text-3xl font-bold font-display text-center text-primary mb-12">Produtos em Destaque</h2>
+              <div className="grid grid-cols-1 gap-y-10 sm:grid-cols-2 lg:grid-cols-4 xl:gap-x-8 gap-6">
+                {featuredProducts.map((product) => (
+                  <ProductCard key={product.code} product={product} />
+                ))}
+              </div>
+            </div>
+          </div>
+        </>
+      )}
     </>
   );
 };
